@@ -574,6 +574,16 @@ const secIcon = s => secIcons[s] || guessIcon(s);
 const pi = (icon, color, cls="") => `<span class="pi ${cls}" style="--c:var(${color})"><i data-lucide="${icon}"></i></span>`;
 const drawIcons = () => { try { if (window.lucide) lucide.createIcons(); } catch(e){} };
 const parseAmt = v => parseFloat(String(v).replace(/,/g,""));
+const groupNum = v => { let t = String(v??"").replace(/[^\d.]/g,""); const i = t.indexOf("."); if (i>=0) t = t.slice(0,i+1)+t.slice(i+1).replace(/\./g,"").slice(0,2);
+  let [a,b] = t.split("."); a = (a||"").replace(/^0+(?=\d)/,""); a = a.replace(/\B(?=(\d{3})+(?!\d))/g,","); return b!==undefined ? (a||"0")+"."+b : a; };
+function liveCommas(inp){
+  inp.addEventListener("input",()=>{
+    const pos = inp.selectionStart ?? inp.value.length, before = inp.value.slice(0,pos).replace(/[^\d.]/g,"").length;
+    const out = groupNum(inp.value); if (out===inp.value) return;
+    inp.value = out; let n=0, c=0; while (c<out.length && n<before){ if (/[\d.]/.test(out[c])) n++; c++; }
+    try { inp.setSelectionRange(c,c); } catch(e){}
+  });
+}
 
 function getRange(p=period, a=anchor){
   const d = new Date(a.getFullYear(), a.getMonth(), a.getDate());
@@ -790,7 +800,7 @@ function openAdd(id, presetSec){
   draft = { id:e?e.id:null, sec: e?secOf(e):(presetSec||scope||allSections()[0]), cat: e?catInfo(e.cat).n:(last?catInfo(last.cat).n:"Furniture"), confirm:false, open:null };
   if (!allSections().includes(draft.sec)) draft.sec = allSections()[0];
   $("a-title").textContent = e ? "Edit Expense" : "Add Expense";
-  $("a-amt").value = e ? e.amount : ""; $("a-note").value = e ? (e.what||"") : ""; $("a-date").value = e ? e.date : todayIso();
+  $("a-amt").value = e ? groupNum(e.amount) : ""; $("a-note").value = e ? (e.what||"") : ""; $("a-date").value = e ? e.date : todayIso();
   $("a-err").textContent = ""; $("a-cur").textContent = currency;
   $("notes-list").innerHTML = [...new Set(entries.slice().sort((a,b)=>b.created-a.created).map(x=>x.what).filter(Boolean))].slice(0,40).map(n=>`<option value="${esc(n)}">`).join("");
   renderAdd(); openS("asheet");
@@ -815,13 +825,14 @@ function renderAdd(){
   drawIcons();
 }
 function updateFoot(){ const inp=$("a-amt"); inp.style.width=Math.max(1,(inp.value||"0").length+0.6)+"ch"; const v=parseAmt(inp.value); $("a-foot-amt").textContent = `${currency} ${fmt(v>0?v:0)}`; }
+liveCommas($("a-amt")); liveCommas($("m-budget"));
 $("a-amt").addEventListener("input",updateFoot);
 $("a-amt").addEventListener("keydown",e=>{ if(e.key==="Enter") saveAdd(); });
 $("a-sec-row").onclick=()=>{ draft.open = draft.open==="sec"?null:"sec"; renderAdd(); };
 $("a-cat-row").onclick=()=>{ draft.open = draft.open==="cat"?null:"cat"; renderAdd(); };
 $("a-secs").onclick=ev=>{ const b=ev.target.closest("[data-s]"); if(b){ draft.sec=b.dataset.s; draft.open=null; renderAdd(); } };
 $("a-cats").onclick=ev=>{ const b=ev.target.closest("[data-c]"); if(b){ draft.cat=b.dataset.c; draft.open=null; renderAdd(); } };
-$("quick").onclick=ev=>{ const b=ev.target.closest("[data-q]"); if(!b) return; const add=+b.dataset.q, cur=parseAmt($("a-amt").value)||0; $("a-amt").value = add ? String(Math.round((cur+add)*100)/100) : ""; updateFoot(); };
+$("quick").onclick=ev=>{ const b=ev.target.closest("[data-q]"); if(!b) return; const add=+b.dataset.q, cur=parseAmt($("a-amt").value)||0; $("a-amt").value = add ? groupNum(String(Math.round((cur+add)*100)/100)) : ""; updateFoot(); };
 $("asheet").addEventListener("click",async ev=>{
   if (ev.target.closest("#a-del")){ draft.confirm=true; renderAdd(); return; }
   const a = ev.target.closest("[data-act]"); if(!a) return;
@@ -858,7 +869,7 @@ let mdraft = null;
 function openSection(name){
   mdraft = { old:name, icon: name ? secIcon(name) : null, confirm:false };
   $("m-title").textContent = name ? "Edit Section" : "New Section";
-  $("m-name").value = name || ""; $("m-budget").value = name && budgets[name] ? budgets[name] : ""; $("m-err").textContent = ""; $("m-cur").textContent = currency;
+  $("m-name").value = name || ""; $("m-budget").value = name && budgets[name] ? groupNum(budgets[name]) : ""; $("m-err").textContent = ""; $("m-cur").textContent = currency;
   renderSection(); openS("msheet");
   if (!name) $("m-name").focus({preventScroll:true});
 }
